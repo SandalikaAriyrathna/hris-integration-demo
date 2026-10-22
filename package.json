@@ -1,0 +1,13 @@
+{
+  "name": "hris-integration-demo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "server": "npm run dev --prefix server",
+    "client": "npm run dev --prefix client -- --port 5174 --strictPort",
+    "dev": "concurrently --kill-others --names server,client \"npm run server\" \"npm run client\""
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  }
+}
