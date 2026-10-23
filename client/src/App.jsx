@@ -144,7 +144,10 @@ export default function App() {
             <button
               type="button"
               className="primary-button"
-              disabled
+              disabled={busy}
+              onClick={() => {
+                window.location.assign("/api/excom/open");
+              }}
             >
               Open Resume Builder
             </button>

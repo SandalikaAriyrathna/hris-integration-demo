@@ -14,6 +14,25 @@ async function request(path, options = {}) {
     headers.set("Content-Type", "application/json");
   }
 
+  const method = (options.method ?? "GET").toUpperCase();
+
+  if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+    const csrf = await request("/api/auth/csrf");
+
+    if (
+      csrf?.headerName !== "X-CSRF-TOKEN" ||
+      typeof csrf.token !== "string" ||
+      !csrf.token
+    ) {
+      throw new PlatformApiError(
+        500,
+        "Unable to obtain a security token. Please refresh and try again.",
+      );
+    }
+
+    headers.set(csrf.headerName, csrf.token);
+  }
+
   const response = await fetch(path, {
     ...options,
     headers,

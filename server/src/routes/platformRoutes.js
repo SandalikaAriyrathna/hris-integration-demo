@@ -134,3 +134,150 @@ platformRouter.post("/auth/logout", (request, response, next) => {
     response.sendStatus(204);
   });
 });
+
+function getExcomConfiguration() {
+  const backend = new URL(process.env.EXCOM_BACKEND_URL);
+  const frontend = new URL(process.env.EXCOM_FRONTEND_URL);
+
+  for (const url of [backend, frontend]) {
+    const localHttp =
+      url.protocol === "http:" &&
+      ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+
+    if (
+      (url.protocol !== "https:" && !localHttp) ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      url.pathname !== "/"
+    ) {
+      throw new Error("Invalid EXCOM integration URL configuration.");
+    }
+  }
+
+  const clientId = process.env.EXCOM_INTEGRATION_CLIENT_ID;
+  const key = process.env.EXCOM_INTEGRATION_KEY;
+
+  if (
+    !clientId ||
+    !/^[A-Za-z0-9_-]{1,100}$/.test(clientId) ||
+    !key ||
+    !/^[A-Fa-f0-9]{64,256}$/.test(key)
+  ) {
+    throw new Error("Missing or invalid EXCOM integration credentials.");
+  }
+
+  return { backend, frontend, clientId, key };
+}
+
+platformRouter.get(
+  "/excom/open",
+  requireEmployeeSession,
+  (_request, response) => {
+    const { frontend } = getExcomConfiguration();
+
+    response.set("Referrer-Policy", "no-referrer");
+
+    return response.redirect(
+      303,
+      new URL("/api/integrations/sso/start", frontend).href,
+    );
+  },
+);
+
+platformRouter.get(
+  "/excom/continue",
+  requireEmployeeSession,
+  async (request, response) => {
+    response.set("Referrer-Policy", "no-referrer");
+
+    const requestId = request.query.requestId;
+
+    if (
+      typeof requestId !== "string" ||
+      !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(
+        requestId,
+      )
+    ) {
+      return response.status(400).json({
+        message: "Invalid EXCOM login request.",
+      });
+    }
+
+    const { backend, frontend, clientId, key } =
+      getExcomConfiguration();
+
+    const employee = request.employee;
+
+    let upstream;
+
+    try {
+      upstream = await fetch(
+        new URL("/api/integrations/sso/launch", backend),
+        {
+          method: "POST",
+          redirect: "error",
+          signal: AbortSignal.timeout(10000),
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${key}`,
+            "X-Integration-Client": clientId,
+          },
+          body: JSON.stringify({
+            requestId,
+            employeeId: employee.employeeId,
+            firstName: employee.firstName,
+            lastName: employee.lastName,
+            email: employee.email,
+            designation: employee.designation,
+          }),
+        },
+      );
+    } catch {
+      return response.status(502).json({
+        message: "EXCOM is unavailable. Return to the demo and try again.",
+      });
+    }
+
+    if (!upstream.ok) {
+      const accountUnavailable = [403, 409].includes(upstream.status);
+
+      return response.status(accountUnavailable ? upstream.status : 502).json({
+        message: accountUnavailable
+          ? "EXCOM could not link or authorize this employee. Contact an administrator."
+          : "EXCOM login could not be started. Check the integration configuration.",
+      });
+    }
+
+    try {
+      const result = await upstream.json();
+
+      if (typeof result.launchUrl !== "string") {
+        throw new Error("Missing launch URL.");
+      }
+
+      const launchUrl = new URL(result.launchUrl);
+      const fragment = new URLSearchParams(launchUrl.hash.slice(1));
+
+      if (
+        launchUrl.origin !== frontend.origin ||
+        launchUrl.pathname !== "/integration/complete" ||
+        launchUrl.username ||
+        launchUrl.password ||
+        launchUrl.search ||
+        fragment.get("requestId") !== requestId ||
+        !/^[A-Za-z0-9_-]{43}$/.test(fragment.get("code") ?? "")
+      ) {
+        throw new Error("Invalid launch URL.");
+      }
+
+      return response.redirect(303, launchUrl.href);
+    } catch {
+      return response.status(502).json({
+        message: "EXCOM returned an invalid login response.",
+      });
+    }
+  },
+);
