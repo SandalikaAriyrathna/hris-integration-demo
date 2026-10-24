@@ -3,6 +3,7 @@ package com.demo.hris.service;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.Set;
 import java.util.UUID;
 
@@ -79,13 +80,28 @@ public class ExcomIntegrationService {
                     "The employee needs an approved first-name and last-name mapping.");
         }
 
+        EmployeeMasterData master = new EmployeeMasterData(
+                employee.getNameWithInitials(),
+                employee.getOriginBranchId(),
+                employee.getBranchName(),
+                employee.getDepartment(),
+                employee.getDivision(),
+                employee.getOfficeLocation(),
+                employee.getEmploymentType(),
+                employee.getHireDate(),
+                employee.getProfileImage(),
+                Set.of()
+        );
+
         LaunchRequest body = new LaunchRequest(
                 requestId,
                 identity.employeeId(),
                 identity.firstName(),
                 identity.lastName(),
                 identity.email(),
-                identity.designation());
+                identity.designation(),
+                master
+        );
 
         final LaunchResponse result;
 
@@ -211,7 +227,21 @@ public class ExcomIntegrationService {
             String firstName,
             String lastName,
             String email,
-            String designation) {
+            String designation,
+            EmployeeMasterData employeeMaster) {
+    }
+
+    public record EmployeeMasterData(
+            String nameWithInitials,
+            String branchId,
+            String branchName,
+            String department,
+            String division,
+            String officeLocation,
+            String employmentType,
+            LocalDate joiningDate,
+            String photoBase64,
+            Set<String> clearFields) {
     }
 
     public record LaunchResponse(String launchUrl) {

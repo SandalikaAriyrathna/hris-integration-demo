@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "employees")
@@ -25,6 +26,33 @@ public class Employee {
 
     @Column(length = 255)
     private String designation;
+
+    @Column(name = "name_with_initials", length = 255)
+    private String nameWithInitials;
+
+    @Column(name = "origin_branch_id", length = 255)
+    private String originBranchId;
+
+    @Column(name = "branch_name", length = 255)
+    private String branchName;
+
+    @Column(length = 255)
+    private String department;
+
+    @Column(length = 255)
+    private String division;
+
+    @Column(name = "office_location", length = 255)
+    private String officeLocation;
+
+    @Column(name = "employment_type", length = 100)
+    private String employmentType;
+
+    @Column(name = "hire_date")
+    private LocalDate hireDate;
+
+    @Column(name = "profile_image", columnDefinition = "LONGTEXT")
+    private String profileImage;
 
     @Column(nullable = false)
     private Integer status;
@@ -71,6 +99,42 @@ public class Employee {
 
     public String getDesignation() {
         return designation;
+    }
+
+    public String getNameWithInitials() {
+        return nameWithInitials;
+    }
+
+    public String getOriginBranchId() {
+        return originBranchId;
+    }
+
+    public String getBranchName() {
+        return branchName;
+    }
+
+    public String getDepartment() {
+        return department;
+    }
+
+    public String getDivision() {
+        return division;
+    }
+
+    public String getOfficeLocation() {
+        return officeLocation;
+    }
+
+    public String getEmploymentType() {
+        return employmentType;
+    }
+
+    public LocalDate getHireDate() {
+        return hireDate;
+    }
+
+    public String getProfileImage() {
+        return profileImage;
     }
 
     public boolean isActive() {
