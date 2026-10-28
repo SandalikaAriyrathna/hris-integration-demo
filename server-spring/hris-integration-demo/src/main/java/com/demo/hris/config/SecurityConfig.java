@@ -13,7 +13,6 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.session.ChangeSessionIdAuthenticationStrategy;
 import org.springframework.security.web.authentication.session.CompositeSessionAuthenticationStrategy;
 import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
@@ -80,8 +79,31 @@ public class SecurityConfig {
                 .logout(logout -> logout.disable())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(
-                                new HttpStatusEntryPoint(
-                                        HttpStatus.UNAUTHORIZED)))
+                                (request, response, exception) -> {
+                                    response.setHeader(
+                                            "Cache-Control", "no-store");
+
+                                    String path = request.getServletPath();
+
+                                    boolean integrationNavigation =
+                                            "GET".equals(request.getMethod())
+                                                    && ("/api/excom/open".equals(path)
+                                                    || "/api/excom/continue".equals(path));
+
+                                    if (integrationNavigation) {
+                                        response.setStatus(
+                                                HttpStatus.SEE_OTHER.value());
+                                        response.setHeader(
+                                                "Location",
+                                                "/?excomError=session");
+                                        response.setHeader(
+                                                "Referrer-Policy",
+                                                "no-referrer");
+                                    } else {
+                                        response.setStatus(
+                                                HttpStatus.UNAUTHORIZED.value());
+                                    }
+                                }))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
                                 HttpMethod.GET,

@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Set;
 import java.util.UUID;
+import java.util.List;
 
 import com.demo.hris.dto.EmployeeResponse;
 import com.demo.hris.model.Employee;
@@ -19,6 +20,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.ProblemDetail;
 
 @Service
 public class ExcomIntegrationService {
@@ -100,7 +102,18 @@ public class ExcomIntegrationService {
                 identity.lastName(),
                 identity.email(),
                 identity.designation(),
-                master
+                master,
+                List.of(
+                        new ProjectData(
+                                "HRIS-PROJECT-001",
+                                "HRIS-DEMO-001",
+                                "HRIS Demo Project",
+                                "Test Branch",
+                                "Test Project Type",
+                                "Test Project Phase",
+                                "Colombo",
+                                "ACTIVE")
+                )
         );
 
         final LaunchResponse result;
@@ -118,11 +131,32 @@ public class ExcomIntegrationService {
         } catch (RestClientResponseException exception) {
             int status = exception.getStatusCode().value();
 
-            if (status == 403 || status == 409) {
+            if (status == 400 || status == 409) {
                 throw new ResponseStatusException(
                         HttpStatus.valueOf(status),
-                        "EXCOM could not link or authorize this employee. "
+                        integrationErrorMessage(exception));
+            }
+
+            if (status == 401) {
+                throw new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED,
+                        "The EXCOM integration credentials or login request "
+                                + "could not be verified. Try opening EXCOM again "
+                                + "or contact an administrator.");
+            }
+
+            if (status == 403) {
+                throw new ResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        "Your linked EXCOM account is unavailable. "
                                 + "Contact an administrator.");
+            }
+
+            if (status == 429) {
+                throw new ResponseStatusException(
+                        HttpStatus.TOO_MANY_REQUESTS,
+                        "Too many EXCOM login requests. "
+                                + "Please wait a minute and try again.");
             }
 
             throw unavailable();
@@ -214,6 +248,33 @@ public class ExcomIntegrationService {
         return uri;
     }
 
+    private String integrationErrorMessage(
+            RestClientResponseException exception) {
+
+        try {
+            ProblemDetail problem =
+                    exception.getResponseBodyAs(ProblemDetail.class);
+
+            if (problem != null
+                    && problem.getDetail() != null
+                    && !problem.getDetail().isBlank()) {
+
+                String message = problem.getDetail()
+                        .replaceAll("\\p{Cntrl}", " ")
+                        .trim();
+
+                return message.length() > 500
+                        ? message.substring(0, 500)
+                        : message;
+            }
+        } catch (RuntimeException ignored) {
+            // Use the safe fallback when the response cannot be decoded.
+        }
+
+        return "EXCOM could not accept the employee or project information. "
+                + "Contact an administrator.";
+    }
+
     private ResponseStatusException unavailable() {
         return new ResponseStatusException(
                 HttpStatus.BAD_GATEWAY,
@@ -228,7 +289,8 @@ public class ExcomIntegrationService {
             String lastName,
             String email,
             String designation,
-            EmployeeMasterData employeeMaster) {
+            EmployeeMasterData employeeMaster,
+            List<ProjectData> projects) {
     }
 
     public record EmployeeMasterData(
@@ -242,6 +304,17 @@ public class ExcomIntegrationService {
             LocalDate joiningDate,
             String photoBase64,
             Set<String> clearFields) {
+    }
+
+    public record ProjectData(
+            String projectId,
+            String projectCode,
+            String projectName,
+            String branchName,
+            String projectTypeName,
+            String projectPhaseName,
+            String location,
+            String status) {
     }
 
     public record LaunchResponse(String launchUrl) {

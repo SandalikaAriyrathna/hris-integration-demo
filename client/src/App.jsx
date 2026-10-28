@@ -15,7 +15,28 @@ export default function App() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+    const [error, setError] = useState(() => {
+    const message =
+      new URLSearchParams(window.location.search).get("excomError") || "";
+
+    return message === "session"
+      ? "Your HRIS session has expired. Please sign in again before opening EXCOM."
+      : message.slice(0, 500);
+  });
+
+    useEffect(() => {
+    const url = new URL(window.location.href);
+
+    if (url.searchParams.has("excomError")) {
+      url.searchParams.delete("excomError");
+
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
