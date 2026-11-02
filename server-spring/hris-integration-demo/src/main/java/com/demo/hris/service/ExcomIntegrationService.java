@@ -26,18 +26,17 @@ import org.springframework.http.ProblemDetail;
 public class ExcomIntegrationService {
 
     private final RestClient restClient;
-    private final URI frontendUrl;
+    private final URI backendOrigin;
     private final String clientId;
     private final String apiKey;
 
     public ExcomIntegrationService(
             @Value("${app.excom.backend-url}") String backendUrl,
-            @Value("${app.excom.frontend-url}") String frontendUrl,
             @Value("${app.excom.client-id}") String clientId,
             @Value("${app.excom.api-key}") String apiKey) {
 
         URI backend = validateOrigin(backendUrl);
-        this.frontendUrl = validateOrigin(frontendUrl);
+        this.backendOrigin = backend;
 
         if (!clientId.matches("[A-Za-z0-9_-]{1,100}")
                 || !apiKey.matches("[A-Fa-f0-9]{64,256}")) {
@@ -64,7 +63,7 @@ public class ExcomIntegrationService {
     }
 
     public URI getStartUrl() {
-        return frontendUrl.resolve("/api/integrations/sso/start");
+        return backendOrigin.resolve("/api/integrations/sso/start");
     }
 
     public URI createLaunch(UUID requestId, Employee employee) {
@@ -188,9 +187,9 @@ public class ExcomIntegrationService {
 
         String query = launch.getRawQuery();
 
-        if (!frontendUrl.getScheme().equalsIgnoreCase(
+        if (!backendOrigin.getScheme().equalsIgnoreCase(
                 launch.getScheme())
-                || !frontendUrl.getRawAuthority().equalsIgnoreCase(
+                || !backendOrigin.getRawAuthority().equalsIgnoreCase(
                 launch.getRawAuthority())
                 || !"/api/integrations/sso/complete".equals(
                 launch.getRawPath())
